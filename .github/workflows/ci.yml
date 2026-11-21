@@ -1,0 +1,76 @@
+name: Python CI (testes e build)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    name: Testes (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    # Postgres de verdade como serviço, igual ao docker-compose
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bookstore_dev
+          POSTGRES_PASSWORD: bookstore_dev
+          POSTGRES_DB: bookstore_dev_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bookstore_dev -d bookstore_dev_db"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      SQL_ENGINE: django.db.backends.postgresql
+      SQL_DATABASE: bookstore_dev_db
+      SQL_USER: bookstore_dev
+      SQL_PASSWORD: bookstore_dev
+      SQL_HOST: localhost
+      SQL_PORT: "5432"
+
+    steps:
+      - name: Baixa o código
+        uses: actions/checkout@v4
+
+      - name: Instala o Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Instala o Poetry
+        run: pip install poetry
+
+      - name: Instala as dependências (poetry install)
+        run: |
+          poetry config virtualenvs.create false
+          poetry install --no-root --no-interaction
+
+      - name: Confere o projeto (check + migrations pendentes)
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+
+      - name: Roda os testes com cobertura
+        run: |
+          coverage run --source=product,order,bookstore manage.py test
+          coverage report -m
+          echo '## Cobertura dos testes (Python ${{ matrix.python-version }})' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          coverage report >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Gera o relatório de cobertura (XML)
+        run: coverage xml
+
+      - name: Guarda o relatório de cobertura
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-python-${{ matrix.python-version }}
+          path: coverage.xml
