@@ -1,0 +1,45 @@
+name: Code Review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  flake8-review:
+    name: Revisão automática (flake8 + reviewdog)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixa o código
+        uses: actions/checkout@v4
+
+      - name: Instala o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # O reviewdog roda o flake8 e comenta direto nas linhas do Pull Request
+      # quando encontra algum problema de estilo ou erro no código.
+      - name: flake8 com reviewdog
+        uses: reviewdog/action-flake8@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          level: warning
+          fail_level: error
+
+  lint:
+    name: Lint (flake8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: flake8
+        run: |
+          pip install flake8
+          flake8 . --count --statistics
