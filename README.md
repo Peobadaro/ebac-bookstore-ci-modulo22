@@ -146,3 +146,21 @@ Na mesma rede bridge, um container encontra o outro pelo nome do serviço. É po
 docker network ls
 docker network inspect bookstore_network
 ```
+
+## CI com GitHub Actions
+
+Workflows em `.github/workflows/`:
+
+| Workflow | Quando roda | O que faz |
+|---|---|---|
+| `ci.yml` | todo push e PR | Instala o projeto com Poetry em **Python 3.12 e 3.13**, sobe um **Postgres** de serviço, roda `check`, confere migrations pendentes e executa os testes com **cobertura** (relatório no resumo do job e como artefato) |
+| `code-review.yml` | todo PR | **Code review automático**: o `reviewdog` roda o `flake8` e comenta direto nas linhas do Pull Request quando acha problema; um job de lint também falha o PR se houver erro |
+| `docker-build.yml` | todo push e PR | Sobe o `docker compose` (web + db), confere a network e roda os testes no container |
+
+Rodar o mesmo localmente:
+
+```bash
+poetry run flake8 .
+poetry run coverage run --source=product,order,bookstore manage.py test
+poetry run coverage report -m
+```
